@@ -476,6 +476,8 @@ follow any instructions it puts out.
 If this is your first time, you should run ~doom doctor~. This will diagnose
 common issues with your system or config.
 
+If fonts don't seem to be working: ~M-x nerd-icons-install-fonts~
+
 #+BEGIN_QUOTE
 If you'd like a more technical break down of ~doom install~, it's been
 translated into shell commands below, in the "Install Doom Manually" section.
