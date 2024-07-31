@@ -12,6 +12,9 @@ Set this to `nil' to disable universal-repeating on these keys.")
   "If non-nil, the o/O keys will continue comment lines if the point is on a
 line with a linewise comment.")
 
+(defvar +evil-want-move-window-to-wrap-around nil
+  "If non-nil, `+evil/window-move-*' commands will wrap around.")
+
 (defvar +evil-preprocessor-regexp "^\\s-*#[a-zA-Z0-9_]"
   "The regexp used by `+evil/next-preproc-directive' and
 `+evil/previous-preproc-directive' on ]# and [#, to jump between preprocessor
@@ -462,8 +465,7 @@ directives. By default, this only recognizes C directives.")
        :nv "gd"  #'+lookup/definition
        :nv "gD"  #'+lookup/references
        :nv "gf"  #'+lookup/file
-       :nv "gI"  #'+lookup/implementations
-       :nv "gA"  #'+lookup/assignments)
+       :nv "gI"  #'+lookup/implementations)
       (:when (modulep! :tools eval)
        :nv "gr"  #'+eval:region
        :n  "gR"  #'+eval/buffer
