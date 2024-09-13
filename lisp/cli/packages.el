@@ -13,9 +13,9 @@
 ;;
 ;;; Commands
 
-(defcli-obsolete! ((build b)) (sync "--rebuild") "v3.0.0")
+(defcli-obsolete! ((build b)) (sync "--rebuild") "3.0.0")
 
-(defcli-obsolete! ((purge p)) (gc) "v3.0.0")
+(defcli-obsolete! ((purge p)) (gc) "3.0.0")
 
 ;; TODO Rename to "doom gc" and move to its own file
 (defcli! (gc)
@@ -23,16 +23,15 @@
      (noelpa-p    ("-p" "--no-elpa")    "Don't purge ELPA packages")
      (norepos-p   ("-r" "--no-repos")   "Don't purge unused straight repos")
      (noeln-p     ("-e" "--no-eln")     "Don't purge old ELN bytecode")
-     (noregraft-p ("-g" "--no-regraft") "Regraft git repos (ie. compact them)"))
+     (noregraft-p ("-g" "--no-regraft") "Don't regraft git repos (ie. compact them)"))
   "Deletes orphaned packages & repos, and compacts them.
 
 Purges all installed ELPA packages (as they are considered temporary). Purges
-all orphaned package repos and builds. If -g/--regraft is supplied, the git
-repos among them will be regrafted and compacted to ensure they are as small as
-possible.
+all orphaned package repos and builds. Also regrafts and compacts package repos
+to ensure they are as small as possible.
 
-It is a good idea to occasionally run this doom purge -g to ensure your package
-list remains lean."
+It is a good idea to occasionally run this command to ensure your package list
+remains lean."
   :benchmark t
   (require 'comp nil t)
   (doom-initialize-core-packages)
@@ -352,7 +351,8 @@ list remains lean."
                      (error
                       (signal 'doom-package-error (list package e)))))))
           (progn
-            (when (featurep 'native-compile)
+            (when (and (featurep 'native-compile)
+                       straight--native-comp-available)
               (doom-packages--compile-site-files)
               (doom-packages--wait-for-native-compile-jobs)
               (doom-packages--write-missing-eln-errors))
@@ -677,7 +677,7 @@ If ELPA-P, include packages installed with package.el (M-x package-install)."
 
 (defvar doom-cli--straight-auto-options
   '(("has diverged from"
-     . "^Reset [^ ]+ to branch")
+     . "^Reset [^ ]+ to ")
     ("but recipe specifies a URL of"
      . "Delete remote \"[^\"]+\", re-create it with correct URL")
     ("has a merge conflict:"
@@ -703,6 +703,31 @@ original state.")
 ;; HACK Remove dired & magit options from prompt, since they're inaccessible in
 ;;      noninteractive sessions.
 (advice-add #'straight-vc-git--popup-raw :override #'straight--popup-raw)
+
+;; HACK: `native-comp' only respects `native-comp-jit-compilation-deny-list'
+;;   when native-compiling packages in interactive sessions. It ignores the
+;;   variable when, say, straight is building packages. This advice forces it to
+;;   obey it, even when used by straight (but only in the CLI).
+(defadvice! doom-cli--native--compile-async-skip-p (fn files &optional recursively load selector)
+  :around #'native-compile-async
+  (let (file-list)
+    (dolist (file-or-dir (ensure-list files))
+      (cond ((file-directory-p file-or-dir)
+             (dolist (file (if recursively
+                               (directory-files-recursively
+                                file-or-dir comp-valid-source-re)
+                             (directory-files file-or-dir
+                                              t comp-valid-source-re)))
+               (push file file-list)))
+            ((file-exists-p file-or-dir)
+             (push file-or-dir file-list))
+            ((signal 'native-compiler-error
+                     (list "Not a file nor directory" file-or-dir)))))
+    (funcall fn (seq-remove (lambda (file)
+                              (seq-some (lambda (re) (string-match-p re file))
+                                        native-comp-deferred-compilation-deny-list))
+                            file-list)
+             recursively load selector)))
 
 ;; HACK Replace GUI popup prompts (which hang indefinitely in tty Emacs) with
 ;;      simple prompts.

@@ -140,7 +140,8 @@ uses a straight or package.el command directly).")
   (after! comp
     ;; HACK Disable native-compilation for some troublesome packages
     (mapc (doom-partial #'add-to-list 'native-comp-deferred-compilation-deny-list)
-          (list "/emacs-jupyter.*\\.el\\'"
+          (list "/seq-tests\\.el\\'"
+                "/emacs-jupyter.*\\.el\\'"
                 "/evil-collection-vterm\\.el\\'"
                 "/vterm\\.el\\'"
                 "/with-editor\\.el\\'"))))
@@ -567,7 +568,7 @@ elsewhere."
                            nil))))
      ;; Merge given plist with pre-existing one
      (cl-loop for (key value) on (list ,@plist) by 'cddr
-              when value
+              when (or (eq key :pin) value)
               do (cl-callf plist-put plist key value))
      ;; Some basic key validation; throws an error on invalid properties
      (condition-case e

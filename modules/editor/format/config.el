@@ -4,6 +4,7 @@
   '(sql-mode           ; sqlformat is currently broken
     tex-mode           ; latexindent is broken
     latex-mode
+    LaTeX-mode
     org-msg-edit-mode) ; doesn't need a formatter
   "A list of major modes in which to not reformat the buffer upon saving.
 
@@ -89,17 +90,22 @@ This is controlled by `+format-on-save-disabled-modes'."
     (setf (alist-get formatter apheleia-formatters)
           (append (delete '(apheleia-formatters-js-indent "--use-tabs" "--tab-width")
                           (alist-get formatter apheleia-formatters))
-                  '(unless (or (cl-loop for file
-                                        in '(".prettierrc"
-                                             ".prettierrc.json"
-                                             ".prettierrc.yml"
-                                             ".prettierrc.yaml"
-                                             ".prettierrc.json5"
-                                             ".prettierrc.js" "prettier.config.js"
-                                             ".prettierrc.mjs" "prettier.config.mjs"
-                                             ".prettierrc.cjs" "prettier.config.cjs"
-                                             ".prettierrc.toml")
-                                        if (locate-dominating-file default-directory file)
-                                        return t)
-                               (assq 'prettier (+javascript-npm-conf)))
-                     (apheleia-formatters-indent "--use-tabs" "--tab-width"))))))
+                  '((when apheleia-formatters-respect-indent-level
+                      (unless (or (cl-loop for file
+                                           in '(".prettierrc"
+                                                ".prettierrc.json"
+                                                ".prettierrc.yml"
+                                                ".prettierrc.yaml"
+                                                ".prettierrc.json5"
+                                                ".prettierrc.js" "prettier.config.js"
+                                                ".prettierrc.mjs" "prettier.config.mjs"
+                                                ".prettierrc.cjs" "prettier.config.cjs"
+                                                ".prettierrc.toml")
+                                           if (locate-dominating-file default-directory file)
+                                           return t)
+                                  (when-let ((pkg (locate-dominating-file default-directory "package.json")))
+                                    (require 'json)
+                                    (let ((json-key-type 'alist))
+                                      (assq 'prettier
+                                            (json-read-file (expand-file-name "package.json" pkg))))))
+                        (apheleia-formatters-indent "--use-tabs" "--tab-width"))))))))

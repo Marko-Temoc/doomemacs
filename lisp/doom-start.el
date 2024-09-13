@@ -52,12 +52,6 @@
 ;; quickly self-correct.
 (setq fast-but-imprecise-scrolling t)
 
-;; Don't ping things that look like domain names.
-(setq ffap-machine-p-known 'reject)
-
-;; Emacs "updates" its ui more often than it needs to, so slow it down slightly
-(setq idle-update-delay 1.0)  ; default is 0.5
-
 ;; Font compacting can be terribly expensive, especially for rendering icon
 ;; fonts on Windows. Whether disabling it has a notable affect on Linux and Mac
 ;; hasn't been determined, but do it anyway, just in case. This increases memory
@@ -147,10 +141,6 @@
 ;; Emacs to its own devices there.
 (unless doom--system-windows-p
   (setq selection-coding-system 'utf-8))
-
-
-;;; Support for Doom-specific file extensions
-(add-to-list 'auto-mode-alist '("/\\.doom\\(?:rc\\|project\\|module\\|profile\\)\\'" . emacs-lisp-mode))
 
 
 ;;
@@ -322,6 +312,15 @@ If RETURN-P, return the message as a string instead of displaying it."
 (doom-run-hook-on 'doom-first-buffer-hook '(find-file-hook doom-switch-buffer-hook))
 (doom-run-hook-on 'doom-first-file-hook   '(find-file-hook dired-initial-position-hook))
 (doom-run-hook-on 'doom-first-input-hook  '(pre-command-hook))
+
+;; If the user's already opened something (e.g. with command-line arguments),
+;; then we should assume nothing about the user's intentions and simply treat
+;; this session as fully initialized.
+(add-hook! 'doom-after-init-hook :depth 100
+  (defun doom-run-first-hooks-if-files-open-h ()
+    (when file-name-history
+      (doom-run-hooks 'doom-first-file-hook 'doom-first-buffer-hook))))
+
 ;; PERF: Activate these later, otherwise they'll fire for every buffer created
 ;;   between now and the end of startup.
 (add-hook! 'after-init-hook
@@ -335,9 +334,8 @@ If RETURN-P, return the message as a string instead of displaying it."
 ;; TODO: Catch errors
 (load! (string-remove-suffix ".el" doom-module-init-file) doom-user-dir t)
 
-;;; Load the rest of $DOOMDIR + modules if noninteractive
 ;; If the user is loading this file from a batch script, let's assume they want
-;; to load their userland config as well.
+;; to load their userland config immediately.
 (when noninteractive
   (doom-require 'doom-profiles)
   (let ((init-file (doom-profile-init-file)))
@@ -348,6 +346,7 @@ If RETURN-P, return the message as a string instead of displaying it."
       ;; Loads modules, then $DOOMDIR/config.el
       (doom-load init-file 'noerror)
       (doom-initialize-packages))))
+
 
 ;;; Entry point
 ;; HACK: This advice hijacks Emacs' initfile loader to accomplish the following:
@@ -385,7 +384,15 @@ If RETURN-P, return the message as a string instead of displaying it."
               ;; the next file it loads into `user-init-file'.
               (setq user-init-file t)
               (when init-file-name
-                (load init-file-name 'noerror 'nomessage 'nosuffix))
+                (load init-file-name 'noerror 'nomessage 'nosuffix)
+                ;; HACK: if `init-file-name' happens to be higher in
+                ;;   `load-history' than a symbol's actual definition,
+                ;;   `symbol-file' (and help/helpful buffers) will report the
+                ;;   source of a symbol as `init-file-name', rather than it's
+                ;;   true source. By removing this file from `load-history', no
+                ;;   one will make that mistake.
+                (setq load-history (delete (assoc init-file-name load-history)
+                                           load-history)))
               ;; If it's still `t', then it failed to load the profile initfile.
               ;; This likely means the user has forgotten to run `doom sync'!
               (when (eq user-init-file t)

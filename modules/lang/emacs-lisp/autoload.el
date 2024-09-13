@@ -116,8 +116,14 @@ if it's callable, `apropos' otherwise."
                            '(outline org-fold-outline))
                  (org-show-hidden-entry))))
            'deferred))
-        (thing (helpful-symbol (intern thing)))
-        ((call-interactively #'helpful-at-point))))
+        (thing
+         (funcall (or (command-remapping #'describe-symbol)
+                      #'describe-symbol)
+                  (intern thing)))
+        ((call-interactively
+          (if (fboundp #'helpful-at-point)
+              #'helpful-at-point
+            #'describe-symbol)))))
 
 ;; DEPRECATED Remove when 28 support is dropped.
 (unless (fboundp 'lisp--local-defform-body-p)
@@ -663,7 +669,6 @@ Adapted from URL `https://www.reddit.com/r/emacs/comments/d7x7x8/finally_fixing_
 ;;   performance sensitive, so we compile this file on-demand, at least, until
 ;;   Doom adds a formal compile step to 'doom sync'.
 (doom-compile-functions #'+emacs-lisp-highlight-vars-and-faces
-                        #'+emacs-lisp-truncate-pin
                         #'+emacs-lisp--calculate-lisp-indent-a)
 
 ;;; autoload.el ends here

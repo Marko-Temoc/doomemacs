@@ -59,7 +59,14 @@ Fixes #3939: unsortable dired entries on Windows."
     (not (eq revert-buffer-function #'dired-virtual-revert)))
 
   ;; To be consistent with vertico/ivy/helm+wgrep integration
-  (define-key dired-mode-map (kbd "C-c C-e") #'wdired-change-to-wdired-mode))
+  (define-key dired-mode-map (kbd "C-c C-e") #'wdired-change-to-wdired-mode)
+
+  ;; On ESC, abort `wdired-mode' (will prompt)
+  (add-hook! 'doom-escape-hook
+    (defun +dired-wdired-exit-h ()
+      (when (eq major-mode 'wdired-mode)
+        (wdired-exit)
+        t))))
 
 
 (use-package! dirvish
@@ -81,40 +88,75 @@ Fixes #3939: unsortable dired entries on Windows."
   ;; buffers. Starting from scratch isn't even that expensive, anyway.
   (setq dirvish-reuse-session nil)
 
-  ;; A more reserved mode-line height that should match doom-modeline's (or the
-  ;; vanilla mode-line's) height.
-  (add-hook! 'after-setting-font-hook
-    (defun +dired-update-mode-line-heigth-h ()
-      ;; REVIEW: Too hardcoded.
-      (setq dirvish-mode-line-height (+ (frame-char-height) 4)
-            dirvish-header-line-height (+ (frame-char-height) 8))))
-  (+dired-update-mode-line-heigth-h)
-
   (if (modulep! +dirvish)
       (setq dirvish-attributes '(file-size)
             dirvish-mode-line-format
             '(:left (sort file-time symlink) :right (omit yank index)))
     (setq dirvish-attributes nil
           dirvish-use-header-line nil
-          dirvish-mode-line-format nil))
+          dirvish-use-mode-line nil))
+
+  ;; Match the height of `doom-modeline', if it's being used.
+  ;; TODO: Make this respect user changes to these variables.
+  (when (modulep! :ui modeline)
+    (add-hook! 'dired-mode-hook
+      (defun +dired-update-mode-line-height-h ()
+        (when-let (height (bound-and-true-p doom-modeline-height))
+          (setq dirvish-mode-line-height height
+                dirvish-header-line-height height)))))
 
   (when (modulep! :ui vc-gutter)
-    (push 'vc-state dirvish-attributes))
+    ;; HACK: Dirvish sets up the fringes for vc-state late in the startup
+    ;;   process, causing this jarring pop-in effect. This advice sets them up
+    ;;   sooner to avoid this.
+    ;; REVIEW: Upstream this later.
+    (defadvice! +dired--init-fringes-a (_dir _buffer setup)
+      :before #'dirvish-data-for-dir
+      (when (and setup (memq 'vc-state dirvish-attributes))
+        (set-window-fringes nil 5 1)))
+    ;; The vc-gutter module uses `diff-hl-dired-mode' + `diff-hl-margin-mode'
+    ;; for diffs in dirvish buffers. `vc-state' uses overlays, so they won't be
+    ;; visible in the terminal.
+    (when (or (daemonp) (display-graphic-p))
+      (push 'vc-state dirvish-attributes)))
+
   (when (modulep! +icons)
     (setq dirvish-subtree-always-show-state t)
     (appendq! dirvish-attributes '(nerd-icons subtree-state)))
 
-  ;; HACK: Doom will treat an integer value for `dirvish-hide-details' to mean
-  ;;   hide file/dir details if window is less than N characters wide (e.g. for
-  ;;   side windows or small full-window layouts).
-  (setq dirvish-hide-details 50)
-  ;; TODO: Proc this hook sooner. The delay on `dirvish-setup-hook' is jarring.
-  (add-hook! 'dirvish-setup-hook
-    (defun +dired-hide-details-in-side-mode-h ()
-      (when (integerp dirvish-hide-details)
-        (dired-hide-details-mode
-         (if (< (window-width dirvish--selected-window) dirvish-hide-details)
-             +1 -1)))))
+  ;; HACK: Fixes #8038. Because `dirvish-reuse-session' is unset above, when
+  ;;   walking a directory tree, previous dired buffers are killed along the
+  ;;   way, which is jarring for folks who expect to be able to switch back to
+  ;;   those buffers before their dired session ends. As long as we retain
+  ;;   those, Dirvish will still clean them up on `dirvish-quit'.
+  (defadvice! +dired--retain-buffers-on-dirvish-find-entry-a (fn &rest args)
+    :around #'dirvish-find-entry-a
+    (let ((dirvish-reuse-session t))
+      (apply fn args)))
+
+  ;; HACK: Makes `dirvish-hide-details' and `dirvish-hide-cursor' accept a list
+  ;;   of symbols to instruct Dirvish in what contexts they should be enabled.
+  ;;   The accepted values are:
+  ;;   - `dired': when opening a directory directly or w/o Dirvish's full UI.
+  ;;   - `dirvish': when opening full-frame Dirvish.
+  ;;   - `dirvish-side': when opening Dirvish in the sidebar.
+  ;; REVIEW: Upstream this behavior later.
+  (setq dirvish-hide-details '(dirvish dirvish-side)
+        dirvish-hide-cursor '(dirvish dirvish-side))
+  (defadvice! +dired--hide-details-maybe-a (fn &rest args)
+    :around #'dirvish-init-dired-buffer
+    (letf! (defun enabled? (val)
+             (if (listp val)
+                 (cond ((if dirvish--this (memq 'side (dv-type dirvish--this)))
+                        (memq 'dirvish-side val))
+                       ((or (null dirvish--this)
+                            (null (car (dv-layout dirvish--this))))
+                        (memq 'dired val))
+                       ((memq 'dirvish val)))
+               val))
+      (let ((dirvish-hide-details (enabled? dirvish-hide-details)))
+        (setq-local dirvish-hide-cursor (and (enabled? dirvish-hide-cursor) t))
+        (apply fn args))))
 
   (when (modulep! :ui tabs)
     (after! centaur-tabs
@@ -132,7 +174,11 @@ Fixes #3939: unsortable dired entries on Windows."
         :n  "F"   #'dirvish-layout-toggle
         :n  "z"   #'dirvish-history-jump
         :n  "gh"  #'dirvish-subtree-up
-        :n  "gl"  #'dirvish-subtree-down
+        :n  "gl"  #'dirvish-subtree-toggle
+        :n  "h"   #'dired-up-directory
+        :n  "l"   #'dired-find-file
+        :gm [left]  #'dired-up-directory
+        :gm [right] #'dired-find-file
         :m  "[h"  #'dirvish-history-go-backward
         :m  "]h"  #'dirvish-history-go-forward
         :m  "[e"  #'dirvish-emerge-next-group
@@ -155,16 +201,34 @@ Fixes #3939: unsortable dired entries on Windows."
          :n "S"   #'dirvish-relative-symlink
          :n "h"   #'dirvish-hardlink))
 
+  ;; HACK: Modifies Dirvish to fall back to default `mode-line-format' if
+  ;;   `dirvish-use-mode-line' is nil, instead of when
+  ;;   `dirvish-mode-line-format' is nil (since the latter *still* prepends to
+  ;;   the default `mode-line-format'), and is overall less intuitive.
+  ;; REVIEW: Upstream this behavior later.
+  (defadvice! +dired--dirvish-use-modeline-a (fn &rest args)
+    "Change how `dirvish-use-mode-line' and `dirvish-mode-line-format' operate."
+    :around #'dirvish--setup-mode-line
+    (when dirvish-use-mode-line
+      (let ((dirvish--mode-line-fmt
+             (if dirvish-mode-line-format
+                 dirvish--mode-line-fmt)))
+        (apply fn args))))
+
   ;; HACK: Kill Dirvish session before switching projects/workspaces, otherwise
   ;;   it errors out on trying to delete/change dedicated windows.
-  (add-hook! '(persp-before-kill-functions projectile-before-switch-project-hook)
+  (add-hook! '(persp-before-kill-functions
+               persp-before-switch-functions
+               projectile-before-switch-project-hook)
     (defun +dired--cleanup-dirvish-h (&rest _)
-      (when-let ((win
-                  (or (and (featurep 'dirvish-side)
-                           (dirvish-side--session-visible-p))
-                      (and dirvish--this (selected-window)))))
-        (delete-window win))))
-
+      (when-let ((dv (cl-loop for w in (window-list)
+                              if (or (window-parameter w 'window-side)
+                                     (window-dedicated-p w))
+                              if (with-current-buffer (window-buffer w) (dirvish-curr))
+                              return it)))
+        (let (dirvish-reuse-session)
+          (with-selected-window (dv-root-window dv)
+            (dirvish-quit))))))
 
   ;; HACK: If a directory has a .dir-locals.el, its settings could
   ;;   interfere/crash Dirvish trying to preview it.
@@ -175,7 +239,10 @@ Fixes #3939: unsortable dired entries on Windows."
       (if (and (file-directory-p (car args))
                (eq (car-safe result) 'dired))
           `(dired . (,@(butlast (cdr result))
-                     ,(format "(let ((enable-local-variables nil)) %s)"
+                     ,(format "(let %s %s)"
+                              (prin1-to-string
+                               (mapcar (lambda (env) `(,(car env) ,(cdr env)))
+                                       (remove '(inhibit-message . t) dirvish-preview-environment)))
                               (car (last (cdr result))))))
         result)))
 
@@ -186,8 +253,8 @@ Fixes #3939: unsortable dired entries on Windows."
   (defadvice! +dired--autoload-pdf-tools-a (fn &rest args)
     :around #'dirvish-pdf-dp
     (when (equal (nth 1 args) "pdf")
-      (require 'pdf-tools nil t)
-      (if (file-exists-p pdf-info-epdfinfo-program)
+      (if (and (require 'pdf-tools nil t)
+               (file-exists-p pdf-info-epdfinfo-program))
           (apply fn args)
         '(info . "`epdfinfo' program required to preview pdfs; run `M-x pdf-tools-install'")))))
 

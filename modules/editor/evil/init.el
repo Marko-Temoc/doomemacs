@@ -116,6 +116,7 @@ variable for an explanation of the defaults (in comments). See
       (csv "csv-mode")
       (custom cus-edit)
       cus-theme
+      dape
       dashboard
       daemons
       deadgrep
@@ -175,6 +176,7 @@ variable for an explanation of the defaults (in comments). See
       helpful
       hg-histedit
       hungry-delete
+      hyrolo
       ibuffer
       (image image-mode)
       image-dired
@@ -364,13 +366,4 @@ and complains if a module is loaded too early (during startup)."
     (dolist (mode evil-collection-mode-list)
       (dolist (req (or (cdr-safe mode) (list mode)))
         (with-eval-after-load req
-          (+evil-collection-init mode +evil-collection-disabled-list)))))
-
-  ;; HACK: The Diff options in `save-some-buffers's prompt should persist after
-  ;;   you quit view-mode, but evil-collection-view's bindings on q/Q break
-  ;;   this, so these are here to restore them.
-  ;; REVIEW: PR this upstream!
-  (map! :after (view evil-collection-view)
-        :map view-mode-map
-        :n "q" #'View-quit
-        :n "Q" #'View-quit-all))
+          (+evil-collection-init mode +evil-collection-disabled-list))))))

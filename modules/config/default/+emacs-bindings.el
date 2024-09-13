@@ -170,9 +170,10 @@
 
        :desc "Toggle last org-clock"          "c" #'+org/toggle-last-clock
        :desc "Cancel current org-clock"       "C" #'org-clock-cancel
-       :desc "Open deft"                      "d" #'deft
+       (:when (modulep! :ui deft)
+        :desc "Open deft"                     "d" #'deft)
        (:when (modulep! :lang org +noter)
-        :desc "Org noter"                    "e" #'org-noter)
+        :desc "Org noter"                     "e" #'org-noter)
 
        :desc "Find file in notes"             "f" #'+default/find-in-notes
        :desc "Browse notes"                   "F" #'+default/browse-notes
@@ -248,6 +249,10 @@
        (:when (modulep! :ui treemacs)
         :desc "Project sidebar"               "p" #'+treemacs/toggle
         :desc "Find file in project rsidebar" "P" #'treemacs-find-file)
+       (:when (modulep! :emacs dired +dirvish)
+        :desc "Open directory in dirvish"     "/" #'dirvish
+        :desc "Project sidebar"               "p" #'dirvish-side
+        :desc "Find file in project sidebar"  "P" #'+dired/dirvish-side-and-follow)
        (:when (modulep! :term shell)
         :desc "Toggle shell popup"            "t" #'+shell/toggle
         :desc "Open shell here"               "T" #'+shell/here)
@@ -284,7 +289,6 @@
        :desc "Search project for symbol"   "." #'+default/search-project-for-symbol-at-point
        :desc "Find file in other project"  "F" #'doom/find-file-in-other-project
        :desc "Search project"              "s" #'+default/search-project
-       :desc "List project todos"          "t" #'magit-todos-list
        :desc "Open project scratch buffer" "x" #'doom/open-project-scratch-buffer
        :desc "Switch to project scratch buffer" "X" #'doom/switch-to-project-scratch-buffer
        (:when (and (modulep! :tools taskrunner)
@@ -334,7 +338,7 @@
        (:when (modulep! :checkers syntax)
         :desc "Flycheck"                   "f" #'flycheck-mode)
        (:when (modulep! :ui indent-guides)
-        :desc "Indent guides"              "i" #'highlight-indent-guides-mode)
+        :desc "Indent guides"              "i" #'indent-bars-mode)
        (:when (modulep! :ui minimap)
         :desc "Minimap mode"               "m" #'minimap-mode)
        (:when (modulep! :lang org +present)
@@ -553,9 +557,6 @@
         "<" #'help-go-back
         "n" #'forward-button
         "p" #'backward-button)
-      (:after helpful
-        :map helpful-mode-map
-        "o" #'link-hint-open-link)
       (:after apropos
         :map apropos-mode-map
         "o" #'link-hint-open-link

@@ -1,12 +1,11 @@
 ;; -*- no-byte-compile: t; -*-
 ;;; tools/magit/packages.el
 
-(when (package! magit :pin "e77782272082977d56635308b89cf686abd87ef5")
-  (when (modulep! +forge)
-    (package! forge :pin "21d410c8102422f32db14ddac4eae9e28c2b5c5a")
-    (package! code-review
-      :recipe (:host github
-               :repo "doomelpa/code-review"
-               :files ("graphql" "code-review*.el"))
-      :pin "e4c34fa284da25d8e0bafbae4300f1db5bdcda44"))
-  (package! magit-todos :pin "501c8db90ab59f8b619618b9d10db2a32a113727"))
+(package! magit :pin "0aa26864e3fc4e6949711a4821caf6819e7ab171") ; 4.1.0
+(when (modulep! +forge)
+  (package! forge :pin "d4e88507bf0d256fd92c8d5ccdbee8f7ccbb99b3") ; 0.4.3
+  (package! code-review
+    :recipe (:host github
+             :repo "doomelpa/code-review"
+             :files ("graphql" "code-review*.el"))
+    :pin "eeffdd9e20ad133e5981f216965445bfae20292a"))
