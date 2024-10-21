@@ -204,7 +204,7 @@
   "Current version of Doom Emacs core.")
 
 ;; DEPRECATED: Remove these when the modules are moved out of core.
-(defconst doom-modules-version "24.10.0-pre"
+(defconst doom-modules-version "24.11.0-pre"
   "Current version of Doom Emacs.")
 
 (defvar doom-init-time nil
@@ -601,7 +601,7 @@ wasn't active when this was called."
     (doom-log ":context: -%s %s" context doom-context)
     (setq doom-context (delq context doom-context))))
 
-(defmacro doom-context-with (contexts &rest body)
+(defmacro with-doom-context (contexts &rest body)
   "Evaluate BODY with CONTEXTS added to `doom-context'."
   (declare (indent 1))
   `(let ((doom-context doom-context))

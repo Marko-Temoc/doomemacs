@@ -344,10 +344,10 @@ without needing to check if they are available."
 
 (defun doom--help-modules-list ()
   (cl-loop for (cat . mod) in (doom-module-list 'all)
-           for readme-path = (or (doom-module-locate-path cat mod "README.org")
-                                 (doom-module-locate-path cat mod))
+           for readme-path = (or (doom-module-locate-path (cons cat mod) "README.org")
+                                 (doom-module-locate-path (cons cat mod)))
            for format = (if mod (format "%s %s" cat mod) (format "%s" cat))
-           if (doom-module-p cat mod)
+           if (doom-module-active-p cat mod)
            collect (list format readme-path)
            else if (and cat mod)
            collect (list (propertize format 'face 'font-lock-comment-face)
@@ -630,8 +630,7 @@ If prefix arg is present, refresh the cache."
                                   (:core doom-core-dir)
                                   (:user doom-user-dir)
                                   (category
-                                   (doom-module-locate-path category
-                                                            (cdr m)))))
+                                   (doom-module-locate-path (cons category (cdr m))))))
                    (readme-path (expand-file-name "README.org" module-path)))
               (insert indent)
               (doom--help-insert-button
@@ -755,3 +754,6 @@ Uses the symbol at point or the current selection, if available."
                                    (format "%s.el" filebase)))
             collect it)
    query "Search loaded files: "))
+
+(provide 'doom-lib '(help))
+;;; help.el ends here

@@ -196,8 +196,8 @@
         "a" #'python-pytest
         "f" #'python-pytest-file-dwim
         "F" #'python-pytest-file
-        "t" #'python-pytest-function-dwim
-        "T" #'python-pytest-function
+        "t" #'python-pytest-run-def-or-class-at-point-dwim
+        "T" #'python-pytest-run-def-or-class-at-point
         "r" #'python-pytest-repeat
         "p" #'python-pytest-dispatch))
 
@@ -323,8 +323,7 @@
 
 (use-package! flycheck-cython
   :when (modulep! +cython)
-  :when (and (modulep! :checkers syntax)
-             (not (modulep! :checkers syntax +flymake)))
+  :when (modulep! :checkers syntax -flymake)
   :after cython-mode)
 
 
@@ -352,7 +351,7 @@
 (use-package! lsp-pyright
   :when (modulep! +lsp)
   :when (modulep! +pyright)
-  :when (not (modulep! :tools lsp +eglot))
+  :when (modulep! :tools lsp -eglot)
   :defer t
   :init
   (when-let ((exe (executable-find "basedpyright")))

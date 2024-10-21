@@ -13,11 +13,11 @@ to a pop up buffer."
           (debug-on-error t))
       (unwind-protect
           (condition-case-unless-debug e
-              (doom-module-context-with
+              (with-doom-module
                   (doom-module-from-path
                    (or (buffer-file-name (buffer-base-buffer))
                        default-directory))
-                (doom-context-with 'eval
+                (with-doom-context 'eval
                   (eval-region beg end buffer load-read-function))
                 (with-current-buffer buffer
                   (let ((pp-max-width nil))
@@ -95,6 +95,15 @@ Intended to replace `lisp-outline-level'."
       (doom/help-modules (car module) (cadr module) 'visit-dir)
     (call-interactively #'elisp-def)))
 
+(defun +emacs-lisp--describe-symbol (symbol)
+  (if (or (not (fboundp 'helpful-symbol))
+          (cl-some (lambda (x) (funcall (nth 1 x) symbol))
+                   describe-symbol-backends))
+      (progn
+        (describe-symbol symbol)
+        (pop-to-buffer (help-buffer)))
+    (helpful-symbol symbol)))
+
 ;;;###autoload
 (defun +emacs-lisp-lookup-documentation (thing)
   "Lookup THING with `helpful-variable' if it's a variable, `helpful-callable'
@@ -117,9 +126,12 @@ if it's callable, `apropos' otherwise."
                  (org-show-hidden-entry))))
            'deferred))
         (thing
-         (funcall (or (command-remapping #'describe-symbol)
-                      #'describe-symbol)
-                  (intern thing)))
+         (let ((thing (intern thing)))
+           (if (and (not (cl-find-class thing))
+                    (fboundp 'helpful-symbol))
+               (helpful-symbol thing)
+             (describe-symbol thing)
+             (pop-to-buffer (help-buffer)))))
         ((call-interactively
           (if (fboundp #'helpful-at-point)
               #'helpful-at-point
